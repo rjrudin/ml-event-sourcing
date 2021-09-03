@@ -1,0 +1,20 @@
+<options xmlns="http://marklogic.com/appservices/search">
+	<search-option>unfiltered</search-option>
+	<quality-weight>0</quality-weight>
+	<transform-results apply="raw"/>
+	<additional-query>
+		<cts:collection-query xmlns:cts="http://marklogic.com/cts">
+			<cts:uri>http://marklogic.com/event-sourcing/event</cts:uri>
+		</cts:collection-query>
+	</additional-query>
+	<constraint name="add">
+		<custom facet="false">
+			<parse apply="parse-add" ns="http://marklogic.com/event-sourcing" at="/com.marklogic.event-sourcing/event-sourcing-lib.xqy"/>
+		</custom>
+	</constraint>
+	<constraint name="remove">
+		<custom facet="false">
+			<parse apply="parse-remove" ns="http://marklogic.com/event-sourcing" at="/com.marklogic.event-sourcing/event-sourcing-lib.xqy"/>
+		</custom>
+	</constraint>
+</options>

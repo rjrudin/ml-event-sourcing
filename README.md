@@ -1,5 +1,4 @@
-This project provides an implementation of the Event Sourcing pattern as described at https://project.marklogic.com/jira/browse/MLPATTERNS-6, 
-along with https://martinfowler.com/eaaDev/EventSourcing.html on the web.
+This project provides an implementation of the Event Sourcing pattern as described at https://martinfowler.com/eaaDev/EventSourcing.html .
 
 To try it out, first deploy the application via Gradle (make sure ports 8833 and 8834 are open):
 

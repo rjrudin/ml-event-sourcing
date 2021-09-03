@@ -1,0 +1,123 @@
+import com.marklogic.client.DatabaseClient
+import com.marklogic.client.datamovement.ExportToWriterListener
+import com.marklogic.client.datamovement.QueryBatcher
+import com.marklogic.client.ext.datamovement.QueryBatcherJobTicket
+import com.marklogic.client.ext.datamovement.job.AbstractQueryBatcherJob
+
+buildscript {
+	repositories {
+		jcenter()
+	}
+	dependencies {
+		classpath "com.marklogic:ml-unit-test-client:${mlUnitTestVersion}"
+		classpath "com.marklogic:ml-gradle:${mlGradleVersion}"
+	}
+}
+
+apply plugin: "java"
+apply plugin: "com.marklogic.ml-gradle"
+
+repositories {
+	jcenter()
+}
+
+dependencies {
+	compile "com.marklogic:marklogic-client-api:4.0.3.1"
+	mlRestApi "com.marklogic:ml-unit-test-modules:${mlUnitTestVersion}"
+
+	// For running ml-unit-test tests via JUnit
+	testCompile "com.marklogic:ml-unit-test-client:${mlUnitTestVersion}"
+	testCompile "com.marklogic:ml-junit:3.0.0"
+	testCompile "junit:junit:4.12"
+
+	// Forcing Spring to use logback instead of commons-logging
+	testRuntime "ch.qos.logback:logback-classic:1.1.8"
+	testRuntime group: "org.slf4j", name: "jcl-over-slf4j", version: "1.7.22"
+	testRuntime group: "org.slf4j", name: "slf4j-api", version: "1.7.22"
+}
+
+task exportJson(type: com.marklogic.gradle.task.datamovement.DataMovementTask) {
+	doLast {
+		ExportJsonToJsonFileJob job = new ExportJsonToJsonFileJob(new File("build/example.json"), "data");
+		runQueryBatcherJob(job);
+	}
+}
+
+class ExportJsonToJsonFileJob extends AbstractQueryBatcherJob {
+	private File exportFile;
+	private String rootPropertyName;
+	private FileWriter fileWriter;
+	private ExportToWriterListener exportToWriterListener;
+
+	ExportJsonToJsonFileJob(File exportFile, String rootPropertyName) {
+		super();
+		this.setExportFile(exportFile);
+		this.rootPropertyName = rootPropertyName;
+	}
+
+	@Override
+	protected String getJobDescription() {
+		return null;
+	}
+
+	@Override
+	protected void prepareQueryBatcher(QueryBatcher queryBatcher) {
+		super.prepareQueryBatcher(queryBatcher);
+
+		try {
+			if (rootPropertyName != null) {
+				fileWriter.write(String.format("{\"%s\":[", rootPropertyName));
+			} else {
+				fileWriter.write("[");
+			}
+			fileWriter.write("\n");
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
+	}
+
+	@Override
+	public QueryBatcherJobTicket run(DatabaseClient databaseClient) {
+		QueryBatcherJobTicket ticket = super.run(databaseClient);
+
+		if (ticket.getQueryBatcher().isStopped()) {
+			try {
+				this.fileWriter.close();
+				RandomAccessFile raf = new RandomAccessFile(exportFile, "rw");
+				raf.seek(raf.length() - 2);
+				if (rootPropertyName != null) {
+					raf.write("]}".getBytes());
+				} else {
+					raf.write("]".getBytes());
+				}
+				raf.close();
+			} catch (IOException ie) {
+				throw new RuntimeException(ie);
+			} finally {
+				try {
+					this.fileWriter.close();
+				} catch (IOException e) {
+					throw new RuntimeException(e);
+				}
+			}
+		}
+
+		return ticket;
+	}
+
+	void setExportFile(File exportFile) {
+		this.exportFile = exportFile;
+		File parentFile = this.exportFile.getParentFile();
+		if (parentFile != null) {
+			parentFile.mkdirs();
+		}
+		try {
+			this.fileWriter = new FileWriter(exportFile);
+		} catch (IOException ie) {
+			throw new RuntimeException("Unable to open FileWriter on file: " + exportFile + "; cause: " + ie.getMessage(), ie);
+		}
+
+		this.exportToWriterListener = new ExportToWriterListener(fileWriter).withRecordSuffix(",\n");
+		this.addUrisReadyListener(exportToWriterListener);
+	}
+}
